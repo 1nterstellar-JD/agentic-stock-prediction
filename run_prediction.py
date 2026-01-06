@@ -44,6 +44,13 @@ def run_prediction():
     parser.add_argument(
         "--target_date", type=str, help="Target date YYYY-MM-DD", default=None
     )
+    parser.add_argument(
+        "--factor_mode",
+        type=str,
+        default="rdagent",
+        choices=["alpha158", "rdagent", "combined", "rdagent_low_corr"],
+        help="Factor set to use: alpha158, rdagent (default), combined, or rdagent_low_corr",
+    )
     args, unknown = parser.parse_known_args()
 
     # --- Automated Date Configuration ---
@@ -89,23 +96,74 @@ def run_prediction():
     # However, we are about to overwrite the handler below if gen_factors exist.
     # So we should store these times to use them in the new_handler.
 
-    if gen_factors:
-        print(f"Found {len(gen_factors)} generated factors: {list(gen_factors.keys())}")
+    # Determine Handler Configuration based on Factor Mode
+    new_handler = None
+    factor_mode = args.factor_mode
+    print(f"Configuring for Factor Mode: {factor_mode}")
 
-        # Modify config to use these factors via Custom Handler
-        if "task" in run_config and "dataset" in run_config["task"]:
-            ds_kwargs = run_config["task"]["dataset"].get("kwargs", {})
+    # Common Processors
+    infer_processors = [{"class": "Fillna", "kwargs": {"fields_group": "feature"}}]
+    learn_processors = [
+        {"class": "DropnaLabel"},
+        {"class": "CSZScoreNorm", "kwargs": {"fields_group": "label"}},
+    ]
 
-            label = [
-                "Ref($close, -5) / $close - 1",
-                "Ref($close, -5) / $close - 1",
-            ]  # Default
-            if isinstance(ds_kwargs.get("handler"), dict):
-                label = ds_kwargs["handler"].get("kwargs", {}).get("label", label)
-            elif hasattr(ds_kwargs.get("handler"), "kwargs"):
-                pass
+    if factor_mode == "alpha158":
+        new_handler = {
+            "class": "Alpha158",
+            "module_path": "qlib.contrib.data.handler",
+            "kwargs": {
+                "start_time": train_start,
+                "end_time": end_date_str,
+                "instruments": "all",
+                "infer_processors": infer_processors,
+                "learn_processors": learn_processors,
+            },
+        }
+    elif factor_mode == "combined":
+        new_handler = {
+            "class": "CombinedFactorHandler",
+            "module_path": "custom_handler",
+            "kwargs": {
+                "start_time": train_start,
+                "end_time": end_date_str,
+                "instruments": "all",
+                "analysis_path": "analyzed_factors.csv",
+                "infer_processors": infer_processors,
+                "learn_processors": learn_processors,
+            },
+        }
+    elif factor_mode == "rdagent_low_corr":
+        # Ensure json exists
+        low_corr_path = "low_corr_factors.json"
+        if not os.path.exists(low_corr_path):
+            print("low_corr_factors.json not found. Running selection script...")
+            sel_res = os.system(
+                "/home/ec2-user/miniforge3/envs/rdagent/bin/python select_low_corr.py"
+            )
+            if sel_res != 0:
+                print("Factor selection failed.")
+                sys.exit(1)
 
-            # Define new handler pointing to custom_handler module
+        new_handler = {
+            "class": "LowCorrFactorHandler",
+            "module_path": "custom_handler",
+            "kwargs": {
+                "start_time": train_start,
+                "end_time": end_date_str,
+                "instruments": "all",
+                "analysis_path": "analyzed_factors.csv",
+                "low_corr_path": low_corr_path,
+                "infer_processors": infer_processors,
+                "learn_processors": learn_processors,
+            },
+        }
+
+    elif factor_mode == "rdagent":
+        if gen_factors:
+            print(
+                f"Found {len(gen_factors)} generated factors: {list(gen_factors.keys())}"
+            )
             new_handler = {
                 "class": "GenFactorHandler",
                 "module_path": "custom_handler",
@@ -114,27 +172,30 @@ def run_prediction():
                     "end_time": end_date_str,
                     "instruments": "all",
                     "analysis_path": "analyzed_factors.csv",
-                    "infer_processors": [
-                        # {
-                        #     "class": "RobustZScoreNorm",
-                        #     "kwargs": {
-                        #         "fields_group": "feature",
-                        #         "clip_outlier": True,
-                        #         "fit_start_time": fit_start_time,
-                        #         "fit_end_time": fit_end_time,
-                        #     },
-                        # },
-                        {"class": "Fillna", "kwargs": {"fields_group": "feature"}},
-                    ],
-                    "learn_processors": [
-                        {"class": "DropnaLabel"},
-                        {"class": "CSZScoreNorm", "kwargs": {"fields_group": "label"}},
-                    ],
-                    "label": label,
+                    "infer_processors": infer_processors,
+                    "learn_processors": learn_processors,
                 },
             }
+        else:
+            print("No generated factors found for RD-Agent mode.")
 
-            # Default fallback for times (preserving instruments from original if needed)
+    if new_handler:
+        # Modify config to use the selected handler
+        if "task" in run_config and "dataset" in run_config["task"]:
+            ds_kwargs = run_config["task"]["dataset"].get("kwargs", {})
+
+            # Conserve Label
+            label = [
+                "Ref($close, -5) / $close - 1",
+                "Ref($close, -5) / $close - 1",
+            ]  # Default
+            if isinstance(ds_kwargs.get("handler"), dict):
+                label = ds_kwargs["handler"].get("kwargs", {}).get("label", label)
+            elif hasattr(ds_kwargs.get("handler"), "kwargs"):
+                pass
+            new_handler["kwargs"]["label"] = label
+
+            # Conserve Instruments
             orig_handler = ds_kwargs.get("handler")
             if isinstance(orig_handler, dict) and "kwargs" in orig_handler:
                 h_kwargs = orig_handler["kwargs"]
@@ -142,7 +203,9 @@ def run_prediction():
                     new_handler["kwargs"]["instruments"] = h_kwargs["instruments"]
 
             run_config["task"]["dataset"]["kwargs"]["handler"] = new_handler
-            print("Config updated to use generated factors via GenFactorHandler.")
+            print(
+                f"Config updated to use {factor_mode} via handler: {new_handler['class']}."
+            )
         else:
             print("Config structure unexpected. Using defaults.")
     else:
@@ -182,7 +245,7 @@ def run_prediction():
 
     if ret != 0:
         print("Qlib workflow failed.")
-        return
+        sys.exit(1)
 
     # Process Results
     try:

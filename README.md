@@ -63,7 +63,15 @@ To see what the model would have predicted on a specific past date (e.g., Dec 31
 bash manual_run.sh 2025-12-31
 ```
 
-### 3. Advanced: Automated Factor Mining
+### 3. Factor Performance Comparison
+Compare the model's performance using different factor sets:
+```bash
+# Run comparison of 4 modes: Alpha158, RD-Agent, Combined, Low-Corr
+bash run_comparison.sh
+```
+The script runs sequentially and saves results in `results/Comparison_YYYYMMDD_HHMMSS`.
+
+### 4. Advanced: Automated Factor Mining
 To automatically discover more factors using the AI Agent in a loop:
 ```bash
 python run_pipeline.py
@@ -77,7 +85,9 @@ python run_pipeline.py
 ## Project Structure
 
 - **`manual_run.sh`**: Main entry point script. Orchestrates the entire pipeline.
-- **`run_prediction.py`**: Core Python script for fetching data, training the model, and running inference.
+- **`run_comparison.sh`**: Script to compare model performance across varying factor sets (Alpha158 vs RD-Agent vs Combined).
+- **`run_prediction.py`**: Core Python script for fetching data, training the model, and running inference. Supports `--factor_mode`.
+- **`select_low_corr.py`**: Utility script to select Alpha158 factors with the lowest correlation to existing RD-Agent factors.
 - **`agent_factor_gen.py`**: AI agent script that mines new factors using RD-Agent.
 - **`factor_loader.py`**: Utility to load and filter high-quality factors (RankIC > 0.01).
 - **`config.yaml`**: Configuration for Qlib initialization and model hyperparameters.

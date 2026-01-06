@@ -1,6 +1,9 @@
 from qlib.data.dataset.handler import DataHandler, DataHandlerLP
 from qlib.data.dataset.loader import QlibDataLoader
+from qlib.contrib.data.handler import Alpha158
 from factor_loader import get_generated_factor_expressions
+import json
+import os
 
 
 class GenFactorHandler(DataHandlerLP):
@@ -22,34 +25,7 @@ class GenFactorHandler(DataHandlerLP):
         # Instantiate defaults if missing
         if data_loader is None:
             features = self.get_feature_config()
-            # Wrap in dictionary to ensure 'feature' group exists in MultiIndex columns
-            # This satisfies processors expecting fields_group="feature"
-            # And also include label?
-            # DataHandler usually loads label separately via get_label_config?
-            # No, DataHandler.setup_data calls self._load_data.
-            # It loads features and labels.
-            # DataHandlerLP expects data_loader to load fields correctly.
-
-            # If we only provide 'feature', where does 'label' come from?
-            # DataHandler calls self.get_label_config()?
-            # No, DataHandler.init calls self.data_loader.load(instruments, start_time, end_time, self._config)?
-
-            # Actually, DataHandler logic:
-            # It combines get_feature_config and get_label_config into self._config?
-            # Or data_loader does it?
-
-            # If we create `data_loader` manually, we assume DataHandler uses it.
-            # DataHandler DOES NOT construct config from get_feature_config if data_loader is provided?
-            # It might?
-
-            # Let's trust that providing {'feature': features} helps.
-            # But what about LABEL?
-            # If we don't load label here, learn_processors might fail (DropnaLabel).
-            # We should include label in the loader config if explicit.
-
             loader_config = {"feature": features}
-            # Add label if we know it?
-            # self._label is captured.
             if self._label:
                 loader_config["label"] = self._label
 
@@ -77,3 +53,81 @@ class GenFactorHandler(DataHandlerLP):
 
     def get_label_config(self):
         return self._label
+
+
+class CombinedFactorHandler(Alpha158):
+    def __init__(self, analysis_path=None, **kwargs):
+        self.analysis_path = analysis_path
+        super().__init__(**kwargs)
+
+    def get_feature_config(self):
+        # Get Alpha158 factors (tuple of exprs, names)
+        alpha158_factors = super().get_feature_config()
+        if isinstance(alpha158_factors, tuple):
+            alpha_exprs, alpha_names = alpha158_factors
+        else:
+            # Fallback if it returns list
+            alpha_exprs, alpha_names = alpha158_factors, alpha158_factors
+
+        # Get generated factors
+        gen_factors_dict = get_generated_factor_expressions(
+            analysis_path=self.analysis_path
+        )
+        gen_exprs = list(gen_factors_dict.values()) if gen_factors_dict else []
+        gen_names = list(gen_factors_dict.keys()) if gen_factors_dict else []
+
+        print(
+            f"CombinedFactorHandler: Loading {len(alpha_exprs)} Alpha158 factors and {len(gen_exprs)} generated factors."
+        )
+
+        # Combine and Deduplicate
+        final_exprs = list(alpha_exprs)
+        final_names = list(alpha_names)
+        existing_names = set(final_names)
+
+        duplicates = []
+        for i, name in enumerate(gen_names):
+            if name in existing_names:
+                duplicates.append(name)
+            else:
+                final_exprs.append(gen_exprs[i])
+                final_names.append(name)
+                existing_names.add(name)
+
+        if duplicates:
+            print(
+                f"CombinedFactorHandler: Skipped {len(duplicates)} duplicate factors: {duplicates}"
+            )
+
+        return (final_exprs, final_names)
+
+
+class LowCorrFactorHandler(GenFactorHandler):
+    def __init__(self, low_corr_path="low_corr_factors.json", **kwargs):
+        self.low_corr_path = low_corr_path
+        super().__init__(**kwargs)
+
+    def get_feature_config(self):
+        # 1. Get RD-Agent Factors
+        rd_factors_dict = get_generated_factor_expressions(
+            analysis_path=self.analysis_path
+        )
+        rd_exprs = list(rd_factors_dict.values()) if rd_factors_dict else []
+        rd_names = list(rd_factors_dict.keys()) if rd_factors_dict else []
+
+        # 2. Get Low-Corr Alpha158 Factors
+        low_corr_factors = {}
+        if os.path.exists(self.low_corr_path):
+            with open(self.low_corr_path, "r") as f:
+                low_corr_factors = json.load(f)
+        else:
+            print(f"LowCorrFactorHandler: {self.low_corr_path} not found!")
+
+        lc_names = list(low_corr_factors.keys())
+        lc_exprs = list(low_corr_factors.values())
+
+        print(
+            f"LowCorrFactorHandler: Loading {len(rd_exprs)} RD-Agent factors and {len(lc_exprs)} Low-Corr Alpha158 factors."
+        )
+
+        return (rd_exprs + lc_exprs, rd_names + lc_names)

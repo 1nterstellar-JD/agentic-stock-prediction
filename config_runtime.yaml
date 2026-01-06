@@ -50,10 +50,10 @@ task:
     class: DatasetH
     kwargs:
       handler:
-        class: GenFactorHandler
+        class: LowCorrFactorHandler
         kwargs:
           analysis_path: analyzed_factors.csv
-          end_time: '2025-12-25'
+          end_time: '2026-01-06'
           infer_processors:
           - class: Fillna
             kwargs:
@@ -65,18 +65,19 @@ task:
           - class: CSZScoreNorm
             kwargs:
               fields_group: label
-          start_time: '2021-12-26'
+          low_corr_path: low_corr_factors.json
+          start_time: '2022-01-07'
         module_path: custom_handler
       segments:
         test:
-        - '2025-11-25'
-        - '2025-12-25'
+        - '2025-12-07'
+        - '2026-01-06'
         train:
-        - '2021-12-26'
-        - '2024-12-25'
+        - '2022-01-07'
+        - '2025-01-06'
         valid:
-        - '2024-12-25'
-        - '2025-11-25'
+        - '2025-01-06'
+        - '2025-12-07'
     module_path: qlib.data.dataset
   model:
     class: CatBoostModel
