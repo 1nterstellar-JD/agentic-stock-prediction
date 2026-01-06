@@ -40,7 +40,7 @@ CHAT_MODEL=vertex_ai/gemini-2.5-pro
 EMBEDDING_MODEL=vertex_ai/gemini-embedding-001
 
 # Google Cloud Configuration
-VERTEX_PROJECT=your-project-id            # e.g. algorithm-test-123456
+VERTEX_PROJECT=your-project-id
 VERTEXAI_LOCATION=us-central1
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/credentials.json
 
