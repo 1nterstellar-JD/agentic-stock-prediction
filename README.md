@@ -24,6 +24,30 @@ conda activate rdagent
 pip install qlib catboost xgboost pyyaml pandas numpy
 ```
 
+## Configuration (.env)
+
+This project requires an LLM to power the Agentic Factor Generation. Create a `.env` file in the project root with your API keys:
+
+```ini
+# .env file template (Vertex AI)
+
+# Environment Type
+MODEL_COSTEER_ENV_TYPE=conda
+BACKEND=rdagent.oai.backend.LiteLLMAPIBackend
+
+# AI Models (Vertex AI / Gemini)
+CHAT_MODEL=vertex_ai/gemini-2.5-pro
+EMBEDDING_MODEL=vertex_ai/gemini-embedding-001
+
+# Google Cloud Configuration
+VERTEX_PROJECT=your-project-id            # e.g. algorithm-test-123456
+VERTEXAI_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/credentials.json
+
+# Fallback (Required by some libs even if dummy)
+OPENAI_API_KEY=dummy_key
+```
+
 ## Quick Start
 
 ### 1. Run Default Prediction (Today)
