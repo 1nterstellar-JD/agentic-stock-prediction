@@ -1,0 +1,405 @@
+name,description,formulation,code
+PriceVWAPRatio10,"[Price-Volume Factor] 10-day Price to VWAP ratio. This factor compares the 10-day simple moving average of closing prices to the 10-day simple moving average of the daily Volume-Weighted Average Price (VWAP). A value greater than 1 suggests the price is closing, on average, higher than its volume-weighted average, indicating bullish pressure.","\frac{Mean(Close, 10)}{Mean(VWAP, 10)}","import qlib
+import pandas as pd
+from qlib.data import D
+
+def calculate_pricevwapratio10():
+    """"""
+    Calculates the PriceVWAPRatio10 factor and saves it to result.h5.
+    
+    Factor Name: PriceVWAPRatio10
+    Description: [Price-Volume Factor] 10-day Price to VWAP ratio. This factor compares the 10-day simple moving average of closing prices to the 10-day simple moving average of the daily Volume-Weighted Average Price (VWAP). A value greater than 1 suggests the price is closing, on average, higher than its volume-weighted average, indicating bullish pressure.
+    Formulation: Mean(Close, 10) / Mean(VWAP, 10)
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression
+    factor_expression = 'Mean($close, 10) / Mean($vwap, 10)'
+
+    # Get all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor values
+    # The result from D.features has a MultiIndex of (instrument, datetime)
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the factor name
+    factor_data = factor_data.rename(columns={factor_expression: 'PriceVWAPRatio10'})
+
+    # CRITICAL: Swap index levels to (datetime, instrument) and sort
+    # This is required for the system to process the output correctly
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to HDF5 file
+    factor_data.to_hdf('result.h5', key='df', mode='w')
+    print(""Factor PriceVWAPRatio10 calculated and saved to result.h5"")
+    print(factor_data.head())
+
+if __name__ == '__main__':
+    calculate_pricevwapratio10()
+"
+Price_vs_VWAP_5D,[Technical Factor] Measures the deviation of the current closing price from the 5-day average Volume-Weighted Average Price (VWAP). A positive value indicates the closing price is stronger than the average price weighted by volume over the past week.,"\frac{\$close_t}{Mean(\$vwap, 5)_t} - 1","import qlib
+from qlib.data import D
+import pandas as pd
+
+def calculate_price_vs_vwap_5d():
+    """"""
+    Calculates the 'Price_vs_VWAP_5D' factor.
+    Factor formulation: ($close_t / Mean($vwap, 5)_t) - 1
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression
+    factor_expression = '($close / Mean($vwap, 5)) - 1'
+    factor_name = 'Price_vs_VWAP_5D'
+
+    # Get all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    factor_data = D.features(
+        instruments=instruments,
+        fields=[factor_expression],
+        names=[factor_name]
+    )
+
+    # Swap level to make datetime the first level of the index
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to HDF5 file
+    factor_data.to_hdf('result.h5', key='df', mode='w')
+
+if __name__ == ""__main__"":
+    calculate_price_vs_vwap_5d()
+"
+Price_vs_MA_20d,"[Mean-Reversion Factor] Measures the ratio of the current closing price to its 20-day simple moving average. A value greater than 1 suggests the price is above its recent average (potentially overbought), while a value less than 1 suggests it is below (potentially oversold).","\frac{P_{t}}{\text{Mean}(P, 20)}","import qlib
+import pandas as pd
+from qlib.data import D
+
+def calculate_price_vs_ma_20d():
+    """"""
+    Calculates the Price_vs_MA_20d factor.
+    Factor: Price_vs_MA_20d
+    Description: [Mean-Reversion Factor] Measures the ratio of the current closing price to its 20-day simple moving average.
+    Formulation: $close / Mean($close, 20)
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define factor name and expression
+    factor_name = ""Price_vs_MA_20d""
+    # The Qlib expression for the factor.
+    # It calculates the ratio of the closing price to its 20-day simple moving average.
+    factor_expression = '$close / Mean($close, 20)'
+
+    # Get all instruments in the 'us' market
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor values
+    # D.features returns a DataFrame with a MultiIndex (instrument, datetime)
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the factor name
+    factor_data.columns = [factor_name]
+
+    # Swap the index levels to (datetime, instrument) and sort
+    # This is a critical step for compatibility with the evaluation system.
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to HDF5 file
+    factor_data.to_hdf('result.h5', key='df', mode='w')
+
+
+if __name__ == ""__main__"":
+    calculate_price_vs_ma_20d()
+"
+VMA10,[Volume Factor] Computes the simple moving average of trading volume over the last 10 days. This factor is intended to capture recent investor interest and activity. Higher values indicate increased trading volume over the period.,"Mean(\$volume_t, 10)","import qlib
+from qlib.data import D
+import pandas as pd
+import os
+
+def calculate_vma10():
+    """"""
+    Calculates the VMA10 factor: 10-day simple moving average of volume.
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression
+    factor_expression = 'Mean($volume, 10)'
+    factor_name = 'VMA10'
+
+    # Get all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # D.features returns a DataFrame with a MultiIndex (instrument, datetime)
+    factor_data = D.features(
+        instruments=instruments,
+        fields=[factor_expression],
+        start_time=None,  # Use all available data
+        end_time=None,
+        freq='day'
+    )
+
+    # Rename the column to the factor name
+    factor_data.columns = [factor_name]
+
+    # CRITICAL: Swap index levels to (datetime, instrument) and sort
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to an HDF5 file
+    output_path = 'result.h5'
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    factor_data.to_hdf(output_path, key='df', mode='w')
+
+if __name__ == '__main__':
+    calculate_vma10()
+"
+PriceOscillator_20D,"[Mean-Reversion Factor] This factor is a detrended price oscillator that measures the percentage deviation of the current adjusted closing price from its 20-day simple moving average. It is used to identify overbought or oversold conditions, capturing mean-reversion tendencies.","\frac{P_{t} - SMA(P, 20)}{SMA(P, 20)}","import pandas as pd
+import qlib
+from qlib.data import D
+
+def calculate_price_oscillator_20d():
+    """"""
+    Calculates the PriceOscillator_20D factor.
+    
+    Factor Name: PriceOscillator_20D
+    Description: [Mean-Reversion Factor] This factor is a detrended price oscillator that measures the percentage deviation of the current adjusted closing price from its 20-day simple moving average. It is used to identify overbought or oversold conditions, capturing mean-reversion tendencies.
+    Formulation: (P_t - SMA(P, 20)) / SMA(P, 20)
+    Variables: {'P_{t}': 'Adjusted closing price on day t.', 'SMA(P, 20)': 'The 20-day simple moving average of the adjusted closing price.'}
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression based on the formulation
+    factor_expression = '($adjclose - Mean($adjclose, 20)) / Mean($adjclose, 20)'
+    factor_name = 'PriceOscillator_20D'
+
+    # Get all instruments in the US market
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # The result will have a column named after the expression string
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the desired factor name
+    factor_data = factor_data.rename(columns={factor_expression: factor_name})
+
+    # CRITICAL: Swap index levels to (datetime, instrument) and sort for correct format
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to HDF5 file
+    factor_data.to_hdf('result.h5', key='df', mode='w')
+    # print(f""Factor '{factor_name}' calculated and saved to result.h5"")
+    # print(""Data sample:"")
+    # print(factor_data.head())
+
+if __name__ == '__main__':
+    calculate_price_oscillator_20d()
+"
+Price_vs_VWAP_10d,[Hybrid Factor] Measures the deviation of the current closing price from the 10-day average of the daily Volume-Weighted Average Price (VWAP). A positive value suggests the price is trading above its recent volume-weighted average.,"\frac{$close_t}{Mean($vwap, 10)} - 1","import qlib
+from qlib.data import D
+import pandas as pd
+
+def calculate_price_vs_vwap_10d():
+    """"""
+    Calculates the 'Price_vs_VWAP_10d' factor.
+    Factor Description: Measures the deviation of the current closing price from the 10-day average of the daily Volume-Weighted Average Price (VWAP).
+    Factor Formulation: ($close / Mean($vwap, 10)) - 1
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor name and expression
+    factor_name = 'Price_vs_VWAP_10d'
+    # The factor expression MUST be defined as a variable named 'factor_expression'
+    factor_expression = '($close / Mean($vwap, 10)) - 1'
+    
+    # Use an alias to name the output column directly
+    aliased_expression = f'{factor_name}: {factor_expression}'
+
+    # Get the list of all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # The result will have a MultiIndex (instrument, datetime)
+    factor_data = D.features(instruments, fields=[aliased_expression])
+
+    # CRITICAL: Swap index levels to (datetime, instrument) and sort for correct format
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to an HDF5 file
+    factor_data.to_hdf('result.h5', key='factor', format='table', data_columns=True)
+
+
+if __name__ == ""__main__"":
+    calculate_price_vs_vwap_10d()
+"
+VolumeRateOfChange20,[Volume Factor] Measures the percentage change in the trading volume over the last 20 trading days. It is used to confirm the strength behind a price movement.,\frac{Volume_{t} - Volume_{t-20}}{Volume_{t-20}},"import pandas as pd
+import qlib
+from qlib.data import D
+
+def calculate_volumerateofchange20():
+    """"""
+    Calculates the VolumeRateOfChange20 factor.
+    Factor Name: VolumeRateOfChange20
+    Description: [Volume Factor] Measures the percentage change in the trading volume over the last 20 trading days. It is used to confirm the strength behind a price movement.
+    Formulation: (Volume_t - Volume_{t-20}) / Volume_{t-20}
+    Variables: {'$volume': 'Daily trading volume of the stock.', 'Ref(x, d)': 'Function to get the value of x from d days ago. Here d=20.'}
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define factor information
+    factor_name = 'VolumeRateOfChange20'
+    
+    # Define the Qlib expression for the factor
+    # Formulation: (Volume_t - Volume_{t-20}) / Volume_{t-20}
+    factor_expression = '($volume - Ref($volume, 20)) / Ref($volume, 20)'
+
+    # Get the list of all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # The result is a DataFrame with a MultiIndex (instrument, datetime)
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the factor name
+    factor_data.columns = [factor_name]
+
+    # Swap the index levels to (datetime, instrument) and sort
+    # This is a mandatory step for the system to process the output correctly
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to a HDF5 file
+    factor_data.to_hdf('result.h5', key='df', mode='w')
+
+if __name__ == ""__main__"":
+    calculate_volumerateofchange20()
+"
+Volume_Ratio_5_20,"[Volume Factor] Ratio of short-term to medium-term trading volume. It is calculated by dividing the 5-day moving average of volume by the 20-day moving average of volume. This factor is designed to detect recent surges in trading activity, which can signal increased investor interest or conviction.","\frac{Mean(Volume_t, 5)}{Mean(Volume_t, 20)}","import qlib
+from qlib.data import D
+import pandas as pd
+
+def calculate_volume_ratio_5_20():
+    """"""
+    Calculates the Volume_Ratio_5_20 factor.
+
+    Factor Name: Volume_Ratio_5_20
+    Factor Description: [Volume Factor] Ratio of short-term to medium-term trading volume. It is calculated by dividing the 5-day moving average of volume by the 20-day moving average of volume. This factor is designed to detect recent surges in trading activity, which can signal increased investor interest or conviction.
+    Factor Formulation: Mean($volume, 5) / Mean($volume, 20)
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define factor name
+    FACTOR_NAME = ""Volume_Ratio_5_20""
+
+    # Define the Qlib expression for the factor
+    # This is a mandatory variable for the system to recognize the factor logic.
+    factor_expression = ""Mean($volume, 5) / Mean($volume, 20)""
+
+    # Get the list of all instruments. This is a mandatory step.
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # D.features returns a DataFrame with a MultiIndex (instrument, datetime)
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the factor name
+    factor_data.columns = [FACTOR_NAME]
+
+    # Swap the index levels to (datetime, instrument) and sort.
+    # This is a critical step to ensure the output format is correct.
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Save the result to an HDF5 file
+    factor_data.to_hdf(""result.h5"", key=""df"", mode=""w"")
+
+
+if __name__ == ""__main__"":
+    calculate_volume_ratio_5_20()
+"
+Volatility20,[Volatility Factor] Calculates the 20-day standard deviation of daily returns. This factor measures the historical price volatility of an asset. Higher values signify greater price fluctuations and are often associated with higher risk.,"StdDev(\frac{Close_t}{Close_{t-1}} - 1, 20)","import qlib
+from qlib.data import D
+import pandas as pd
+import os
+
+def calculate_volatility20():
+    """"""
+    Calculates the Volatility20 factor and saves it to a HDF5 file.
+    Factor: 20-day standard deviation of daily returns.
+    Formulation: StdDev( (Close_t / Close_{t-1}) - 1, 20)
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression
+    factor_expression = 'Std(($close/Ref($close, 1))-1, 20)'
+    factor_name = 'Volatility20'
+
+    # Get all instruments
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the factor name
+    factor_data.columns = [factor_name]
+
+    # Swap the index levels to (datetime, instrument) and sort
+    factor_data = factor_data.swaplevel().sort_index()
+
+    # Define the output path
+    output_path = 'result.h5'
+
+    # Save the result to HDF5
+    factor_data.to_hdf(output_path, key='df', mode='w')
+
+if __name__ == ""__main__"":
+    calculate_volatility20()
+"
+MeanReversion_10D,[Mean Reversion Factor] Measures how far the current closing price has deviated from its 10-day moving average. A positive value suggests the stock is oversold relative to its recent trend and may revert upwards.,"\frac{\text{Mean}(Close, 10)}{Close_{t}} - 1","import qlib
+from qlib.data import D
+import pandas as pd
+
+def calculate_meanreversion_10d():
+    """"""
+    Calculates the MeanReversion_10D factor.
+
+    Factor Name: MeanReversion_10D
+    Description: [Mean Reversion Factor] Measures how far the current closing price has deviated from its 10-day moving average. A positive value suggests the stock is oversold relative to its recent trend and may revert upwards.
+    Formulation: (Mean(Close, 10) / Close_t) - 1
+    """"""
+    # Initialize Qlib
+    qlib.init(provider_uri='/home/ec2-user/rdagent_stock_predict/qlib_data', region='us')
+
+    # Define the factor expression based on the formulation
+    factor_expression = '(Mean($close, 10) / $close) - 1'
+
+    # Get all instruments in the market
+    instruments = D.instruments(market='all')
+
+    # Calculate the factor using D.features
+    # The result is a DataFrame with a MultiIndex (instrument, datetime)
+    factor_data = D.features(instruments, fields=[factor_expression])
+
+    # Rename the column to the specified factor name
+    factor_data = factor_data.rename(columns={factor_expression: 'MeanReversion_10D'})
+
+    # Swap the index levels to (datetime, instrument) and sort for correct format
+    factor_data = factor_data.swaplevel().sort_index()
+
+    return factor_data
+
+if __name__ == ""__main__"":
+    # Calculate the factor values
+    result_df = calculate_meanreversion_10d()
+
+    # Save the resulting DataFrame to an HDF5 file
+    result_df.to_hdf('result.h5', key='df', mode='w')
+"

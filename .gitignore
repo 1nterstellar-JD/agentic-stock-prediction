@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.env
+.venv
+env/
+venv/
+.ipynb_checkpoints/
+
+# Qlib & Data
+qlib_data/
+raw_data/
+pickle_cache/
+mlruns/
+log/
+git_ignore_folder/
+
+# Project Artifacts
+results/
+*.pkl
+*.bin
+weekly_ranking.csv
+metrics.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

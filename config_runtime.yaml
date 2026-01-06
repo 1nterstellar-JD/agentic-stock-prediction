@@ -1,0 +1,107 @@
+benchmark: ^GSPC
+data_handler_config:
+  end_time: 2025-12-31
+  fit_end_time: 2024-12-31
+  fit_start_time: 2020-01-01
+  infer_processors:
+  - class: RobustZScoreNorm
+    kwargs:
+      clip_outlier: true
+      fields_group: feature
+  - class: Fillna
+    kwargs:
+      fields_group: feature
+  instruments: all
+  label: &id001
+  - Ref($close, -5) / $close - 1
+  learn_processors:
+  - class: DropnaLabel
+  - class: CSRankNorm
+    kwargs:
+      fields_group: label
+  start_time: 2020-01-01
+market: all
+port_analysis_config: &id002
+  backtest:
+    account: 100000000
+    benchmark: ^GSPC
+    end_time: 2025-12-31
+    exchange_kwargs:
+      close_cost: 0.0015
+      deal_price: close
+      limit_threshold: 0.095
+      min_cost: 5
+      open_cost: 0.0005
+    start_time: 2025-01-01
+  strategy:
+    class: TopkDropoutStrategy
+    kwargs:
+      n_drop: 5
+      signal: <PRED>
+      topk: 50
+    module_path: qlib.contrib.strategy
+qlib_init:
+  provider_uri: /home/ec2-user/rdagent_stock_predict/qlib_data
+  region: us
+sys:
+  experiment: weekly_prediction
+task:
+  dataset:
+    class: DatasetH
+    kwargs:
+      handler:
+        class: GenFactorHandler
+        kwargs:
+          analysis_path: analyzed_factors.csv
+          end_time: '2025-12-25'
+          infer_processors:
+          - class: Fillna
+            kwargs:
+              fields_group: feature
+          instruments: all
+          label: *id001
+          learn_processors:
+          - class: DropnaLabel
+          - class: CSZScoreNorm
+            kwargs:
+              fields_group: label
+          start_time: '2021-12-26'
+        module_path: custom_handler
+      segments:
+        test:
+        - '2025-11-25'
+        - '2025-12-25'
+        train:
+        - '2021-12-26'
+        - '2024-12-25'
+        valid:
+        - '2024-12-25'
+        - '2025-11-25'
+    module_path: qlib.data.dataset
+  model:
+    class: CatBoostModel
+    kwargs:
+      allow_writing_files: false
+      depth: 6
+      early_stopping_rounds: 50
+      iterations: 1000
+      l2_leaf_reg: 30
+      learning_rate: 0.042
+      loss: RMSE
+      thread_count: 20
+    module_path: qlib.contrib.model.catboost_model
+  record:
+  - class: SignalRecord
+    kwargs:
+      dataset: <DATASET>
+      model: <MODEL>
+    module_path: qlib.workflow.record_temp
+  - class: SigAnaRecord
+    kwargs:
+      ana_long_short: false
+      ann_scaler: 52
+    module_path: qlib.workflow.record_temp
+  - class: PortAnaRecord
+    kwargs:
+      config: *id002
+    module_path: qlib.workflow.record_temp
